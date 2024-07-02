@@ -9,11 +9,9 @@ import * as yargs from 'yargs';
 import serverModule from './container';
 import { Container } from 'inversify';
 import { CollaborationServer } from './collaboration-server';
-import oauthModule from 'open-collaboration-server-oauth/lib/oauth-module';
 
 const container = new Container();
 container.load(serverModule);
-container.load(oauthModule)
 const server = container.get(CollaborationServer);
 
 const command = yargs.version('0.0.1').command<{

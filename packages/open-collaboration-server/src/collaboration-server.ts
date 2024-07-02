@@ -4,7 +4,7 @@
 // terms of the MIT License, which is available in the project root.
 // ******************************************************************************
 
-import { inject, injectable } from 'inversify';
+import { inject, injectable, multiInject } from 'inversify';
 import * as http from 'http';
 import * as path from 'path';
 import { Server } from 'socket.io';
@@ -19,7 +19,7 @@ import { User } from './types';
 import { ErrorMessage, MessageEncoding } from 'open-collaboration-rpc';
 import { EncodingProvider } from './encoding-provider';
 import * as types from 'open-collaboration-protocol';
-import { OAuthEnpoint } from 'open-collaboration-server-oauth/lib/oauth-endpoint';
+import { AuthEndpoint } from './auth-endpoints/auth-endpoint';
 
 @injectable()
 export class CollaborationServer {
@@ -39,10 +39,8 @@ export class CollaborationServer {
     @inject(PeerFactory)
     protected readonly peerFactory: PeerFactory;
 
-    @inject(OAuthEnpoint)
-    protected readonly oauthEndpoint: OAuthEnpoint;
-
-    protected simpleLogin = true;
+    @multiInject(AuthEndpoint)
+    protected readonly authEndpoints: AuthEndpoint[];
 
     startServer(args: Record<string, unknown>): void {
         const app = this.setupApiRoute()
@@ -84,8 +82,14 @@ export class CollaborationServer {
             }
         });
         httpServer.listen(Number(args.port), String(args.hostname));
-        this.oauthEndpoint.onStart(app, String(args.hostname), Number(args.port),);
-        this.oauthEndpoint.onDidSuccessfullyAuthenticate = (token, user) => this.credentials.confirmUser(token, user)
+
+        for(const authEndpoint of this.authEndpoints) {
+            if(authEndpoint.shouldActivate()) {
+                authEndpoint.onStart(app, String(args.hostname), Number(args.port));
+                authEndpoint.onDidSuccessfullyAuthenticate(e => this.credentials.confirmUser(e.token, e.userInfo));
+            }
+        }
+
         console.log('Open Collaboration Server listening on ' + args.hostname + ':' + args.port);
     }
 
@@ -165,24 +169,6 @@ export class CollaborationServer {
                 res.send('false');
             }
         });
-        if (this.simpleLogin) {
-            app.post('/api/login/simple', async (req, res) => {
-                try {
-                    const token = req.body.token as string;
-                    const user = req.body.user as string;
-                    const email = req.body.email as string | undefined;
-                    await this.credentials.confirmUser(token, {
-                        name: user,
-                        email
-                    });
-                    res.send('Ok');
-                } catch (err) {
-                    console.error(err);
-                    res.status(400);
-                    res.send('Failed to perform simple login');
-                }
-            });
-        }
         app.post('/api/login/confirm/:token', async (req, res) => {
             try {
                 const token = req.params.token as string;

@@ -13,6 +13,9 @@ import { RoomManager } from './room-manager';
 import { PeerInfo } from './types';
 import { UserManager } from './user-manager';
 import { EncodingProvider } from './encoding-provider';
+import { SimpleLoginEndpoint } from './auth-endpoints/simple-login-endpoint';
+import { AuthEndpoint } from './auth-endpoints/auth-endpoint';
+import { OAuthEnpoint } from './auth-endpoints/oauth-endpoint';
 
 export default new ContainerModule(bind => {
     bind(CollaborationServer).toSelf().inSingletonScope();
@@ -28,4 +31,9 @@ export default new ContainerModule(bind => {
         child.bind(PeerInfo).toConstantValue(peerInfo);
         return child.get(PeerImpl);
     });
+
+    bind(SimpleLoginEndpoint).toSelf().inSingletonScope();
+    bind(AuthEndpoint).toService(SimpleLoginEndpoint);
+    bind(OAuthEnpoint).toSelf().inSingletonScope();
+    bind(AuthEndpoint).toService(OAuthEnpoint);
 });
